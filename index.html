@@ -184,13 +184,19 @@
       min-width: 115mm;
     }
 
+    /* ===== 精研欄（今回の最適化ポイント） ===== */
     .issuer{
       border: var(--thin) solid var(--border);
-      padding: 3mm;
+      padding: 3mm 3mm 3mm 2mm; /* 左だけ少し詰める */
       box-sizing: border-box;
       font-size: 11px;
       position: relative;
     }
+    /* 文字ブロックをラップし、印鑑分の逃げを確保 */
+    .issuer-text{
+      margin-right: 22mm; /* 印鑑スペース */
+    }
+
     .issuer-name{
       font-weight: 900;
       font-size: 13.5px;
@@ -198,11 +204,11 @@
     }
     .issuer .rowline{
       display:flex;
-      gap: 5px;
+      gap: 3px; /* 詰める */
       white-space: nowrap;
       margin: 0.8mm 0;
     }
-    .issuer .k{ width: 16mm; font-weight:700; }
+    .issuer .k{ width: 10mm; font-weight:700; } /* 〒/TEL/FAXを寄せる */
     .issuer .v{ flex: 1; white-space: normal; }
 
     .issuer .tantou{
@@ -378,7 +384,6 @@
           <div style="flex:1">
             <label>見積番号（自動生成。必要なら編集可）</label>
             <input id="quoteNo" type="text" />
-           
           </div>
           <div style="width:190px">
             <label>発行日</label>
@@ -390,8 +395,8 @@
           <div style="flex:1">
             <label>担当者</label>
             <select id="tantouSelect" style="width:100%">
-              
-              <option value="" selected>選択してください</option><option value="樋口大">樋口大</option>
+              <option value="" selected>選択してください</option>
+              <option value="樋口大">樋口大</option>
               <option value="巽隆充">巽隆充</option>
               <option value="三谷剛史">三谷剛史</option>
               <option value="山崎迅人">山崎迅人</option>
@@ -501,12 +506,14 @@
 
         <div class="issuer">
           <img class="inkan" src="inkan.png" alt="会社印"/>
-          <div class="issuer-name">株式会社 精研</div>
-          <div class="rowline"><div class="k">〒</div><div class="v">573-0102</div></div>
-          <div class="rowline"><div class="k"></div><div class="v">大阪府枚方市長尾家具町3-12-3</div></div>
-          <div class="rowline"><div class="k">TEL</div><div class="v">072-856-8253</div></div>
-          <div class="rowline"><div class="k">FAX</div><div class="v">072-856-8254</div></div>
-          <div class="tantou" id="outTantou">担当者　＿＿＿＿</div>
+          <div class="issuer-text">
+            <div class="issuer-name">株式会社 精研</div>
+            <div class="rowline"><div class="k">〒</div><div class="v">573-0102</div></div>
+            <div class="rowline"><div class="k"></div><div class="v">大阪府枚方市長尾家具町3-12-3</div></div>
+            <div class="rowline"><div class="k">TEL</div><div class="v">072-856-8253</div></div>
+            <div class="rowline"><div class="k">FAX</div><div class="v">072-856-8254</div></div>
+            <div class="tantou" id="outTantou">担当者　＿＿＿＿</div>
+          </div>
         </div>
       </div>
 
@@ -756,7 +763,7 @@
 
       items.push({ name: opt.name, qty, unitPrice: opt.price });
     }
-      // その他（任意）
+    // その他（任意）
     const ocb = document.getElementById('opt_other');
     if(ocb && ocb.checked){
       const name = (document.getElementById('otherName').value || '').trim() || 'その他';
@@ -831,8 +838,7 @@
     const payment = document.getElementById('payment').value.trim() || '納入時 現金一括払い';
     const valid = document.getElementById('valid').value.trim() || '30日';
 
-    const notes = document.getElementById('notes').value.trim()
-      || '本見積書の有効期限は30日です。有効期限が切れた場合は、再見積となります。';
+    const notes = document.getElementById('notes').value.trim() || '';
 
     const tantou = document.getElementById('tantouSelect').value;
 
@@ -902,26 +908,24 @@
 
   function resetAll(){
     const today = new Date();
-    // 発行日は本日で初期化（ブランク運用でも不都合が少ないため）
+    // 発行日は本日で初期化（運用上の事故が少ない）
     document.getElementById('issueDate').valueAsDate = today;
 
     // 見積番号は発行日に基づき自動生成
     document.getElementById('quoteNo').value = generateQuoteNoFromIssueDate();
 
-    // ブランク指定（ご要望範囲）
+    // デフォルトはブランク運用（ご要望どおり）
     document.getElementById('toBase').value = '';
     document.getElementById('toHonorific').value = '御中';
-
-    // 担当者は未選択
     document.getElementById('tantouSelect').value = '';
 
-    // 条件欄は従来の定型を維持（必要に応じて変更してください）
+    // 条件欄：定型は維持（必要ならここもブランクにできます）
     document.getElementById('delivery').value = '受注後 約3カ月';
     document.getElementById('place').value = '御社ご指定場所';
     document.getElementById('payment').value = '納入時 現金一括払い';
     document.getElementById('valid').value = '30日';
 
-    // 備考はブランク
+    // 備考：ブランク
     document.getElementById('notes').value = '';
 
     // 本体数量
@@ -954,16 +958,12 @@
     applyAndRender();
   }
 
-
   // ====== PDF生成（ダウンロード） ======
   async function downloadPDF(){
-    // 依存ライブラリが読み込めない環境（オフライン等）の場合は、印刷/PDF保存に誘導
     if(!window.html2canvas || !window.jspdf){
       alert('PDF生成（ダウンロード）はネット接続が必要です。\n「印刷 / PDF保存（推奨）」をご利用ください。');
       return;
     }
-
-    // 念のため最新反映
     applyAndRender();
 
     const el = document.getElementById('paper');
@@ -973,21 +973,17 @@
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
-    // A4: 210 × 297
     const pageW = 210;
     const pageH = 297;
 
-    // 画像の縦横比を保ってフィット
     const imgW = pageW;
     const imgH = canvas.height * (imgW / canvas.width);
 
     if(imgH <= pageH){
       pdf.addImage(imgData, 'PNG', 0, 0, imgW, imgH);
     }else{
-      // 1ページに収まらない場合（通常は起きにくい）— 2ページ分割
       let y = 0;
       let remaining = imgH;
-
       while(remaining > 0){
         pdf.addImage(imgData, 'PNG', 0, -y, imgW, imgH);
         remaining -= pageH;
@@ -1037,7 +1033,7 @@
   document.getElementById('issueDate').addEventListener('change', onIssueDateChange);
   document.getElementById('baseQty').addEventListener('input', applyAndRender);
 
-  // 初期化
+  // 初期化（ブランク＋リセットボタン運用）
   resetAll();
 </script>
 
