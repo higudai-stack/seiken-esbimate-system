@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>見積書作成（彩専用）</title>
+
+  <style>
+    :root{
+      --border:#333;
+      --thin:1px;
+    }
+
+    body{
+      font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+      margin: 16px;
+      color:#111;
+    }
+
+    /* 画面：入力UI */
+    .toolbar{
+      display:flex; gap:8px; flex-wrap:wrap;
+      align-items:center; margin-bottom:12px;
+    }
+    .card{
+      border:1px solid #ddd; border-radius:10px;
+      padding:12px; margin-bottom:12px;
+    }
+    .grid{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:12px;
+    }
+    .row{
+      display:flex; gap:8px; align-items:center; flex-wrap:wrap;
+    }
+    label{ font-size: 13px; }
+    input, select, textarea, button{
+      font-size: 13px;
+      padding:6px 8px;
+    }
+    input[type="text"], textarea{
+      width: 100%;
+      box-sizing:border-box;
+    }
+    textarea{ min-height: 52px; }
+
+    .opt-list{
+      display:grid;
+      grid-template-columns: 1fr 120px 80px;
+      gap:6px 8px;
+      align-items:center;
+    }
+    .opt-head{
+      font-weight:700;
+      border-bottom:1px solid #ddd;
+      padding-bottom:6px;
+      margin-bottom:6px;
+    }
+    .opt-name{
+      display:flex; align-items:center; gap:8px;
+    }
+    .price{
+      text-align:right;
+      font-variant-numeric: tabular-nums;
+    }
+    .qty{
+      width:70px;
+    }
+    .muted{ color:#666; font-size:12px; }
+
+    /* 印刷：見積書エリアだけ表示 */
+    @media print{
+      body{ margin:0; }
+      .no-print{ display:none !important; }
+      .print-area{
+        margin:0;
+        padding:0;
+      }
+    }
+
+    /* ===== 見積書（A4） ===== */
+    .print-area{
+      max-width: 210mm;
+      margin: 0 auto;
+    }
+
+    .paper{
+      width: 210mm;
+      min-height: 297mm;
+      padding: 10mm 12mm;
+      box-sizing: border-box;
+    }
+
+    .header{
+      display:grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      align-items:center;
+      margin-bottom: 4mm;
+    }
+    .no{
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .title{
+      text-align:center;
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: 6px;
+    }
+    .date{
+      text-align:right;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .top-block{
+      margin-top: 4mm;
+      display:grid;
+      grid-template-columns: 1fr 68mm;
+      gap: 10mm;
+      align-items:start;
+    }
+
+    /* 宛名 */
+    .to{
+      padding-top: 2mm;
+    }
+    .to-name{
+      font-size: 21px;              /* 宛名：大きめ */
+      font-weight: 800;
+      display:inline-block;
+      padding-bottom: 2mm;
+      border-bottom: var(--thin) solid var(--border);
+      min-width: 115mm;
+    }
+
+    /* 発行者（精研） */
+    .issuer{
+      border: var(--thin) solid var(--border);
+      padding: 3mm;
+      box-sizing: border-box;
+      font-size: 11px;
+      position: relative; /* 印鑑の絶対配置 */
+    }
+    .issuer-name{
+      font-weight: 900;
+      font-size: 13.5px;
+      margin-bottom: 1.5mm;
+    }
+    .issuer .rowline{
+      display:flex;
+      gap: 5px;
+      white-space: nowrap;
+      margin: 0.8mm 0;
+    }
+    .issuer .k{ width: 16mm; font-weight:700; }
+    .issuer .v{ flex: 1; white-space: normal; }
+
+    .issuer .tantou{
+      margin-top: 3mm;
+      border-top: 1px dashed #777;
+      padding-top: 2mm;
+      font-weight: 700;
+    }
+
+    /* 会社印 */
+    .inkan{
+      position:absolute;
+      right: 5mm;
+      top: 5mm;
+      width: 18mm;
+      height: auto;
+      opacity: 0.95;
+    }
+
+    /* 「下記の通り…」は総金額のところにだけ出す */
+    .greeting{
+      margin-top: 4mm;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .summary{
+      margin-top: 2mm;
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      align-items:end;
+      border-top: var(--thin) solid var(--border);
+      border-bottom: var(--thin) solid var(--border);
+      padding: 2.5mm 0;
+    }
+    .sum-label{
+      font-size: 14px;
+      font-weight: 900;
+    }
+    .sum-amount{
+      text-align:right;
+      font-size: 22px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* 条件欄 */
+    .cond{
+      margin-top: 4mm;
+      border: var(--thin) solid var(--border);
+      border-collapse: collapse;
+      width:100%;
+      font-size: 12px;
+    }
+    .cond td{
+      border: var(--thin) solid var(--border);
+      padding: 2.2mm;
+      vertical-align: middle;
+    }
+    .cond .k{ width: 18mm; font-weight: 800; background:#f7f7f7; }
+    .cond .v{ width: 60mm; }
+    .cond .k2{ width: 22mm; font-weight: 800; background:#f7f7f7; }
+
+    /* 明細表 */
+    .items{
+      margin-top: 4mm;
+      border: var(--thin) solid var(--border);
+      border-collapse: collapse;
+      width:100%;
+      font-size: 12px;
+    }
+    .items th, .items td{
+      border: var(--thin) solid var(--border);
+      padding: 2.1mm;
+    }
+    .items th{
+      background:#f7f7f7;
+      font-weight: 900;
+    }
+    .items .c-qty{ width: 12mm; text-align:center; }
+    .items .c-unit{ width: 28mm; text-align:right; }
+    .items .c-amt{ width: 28mm; text-align:right; }
+    .items .desc{ width:auto; }
+
+    /* 下段：備考と小計 */
+    .bottom{
+      margin-top: 4mm;
+      display:grid;
+      grid-template-columns: 1fr 70mm;
+      gap: 6mm;
+      align-items:start;
+    }
+    .note-box{
+      border: var(--thin) solid var(--border);
+      min-height: 36mm;
+      padding: 2.5mm;
+      box-sizing:border-box;
+      font-size: 12px;
+    }
+    .totals{
+      border: var(--thin) solid var(--border);
+      border-collapse: collapse;
+      width:100%;
+      font-size: 12px;
+    }
+    .totals td{
+      border: var(--thin) solid var(--border);
+      padding: 2.2mm;
+    }
+    .totals .k{
+      font-weight: 900;
+      background:#f7f7f7;
+      width: 28mm;
+    }
+    .totals .v{
+      text-align:right;
+      font-variant-numeric: tabular-nums;
+      font-weight: 900;
+    }
+
+    /* 注意事項 */
+    .caution{
+      margin-top: 4mm;
+      border-top: var(--thin) solid var(--border);
+      padding-top: 3mm;
+      font-size: 12px;
+    }
+    .caution .head{
+      color:#b00000;
+      font-weight: 900;
+      margin-bottom: 2mm;
+    }
+    .caution ul{
+      margin: 0;
+      padding-left: 18px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- 入力UI（画面だけ。印刷時は非表示） -->
+  <div class="no-print">
+    <div class="toolbar">
+      <button onclick="window.print()">印刷 / PDF保存</button>
+      <button onclick="resetToSample()">サンプルに戻す</button>
+      <button onclick="regenQuoteNo()">見積番号を再生成</button>
+      <span class="muted">彩専用：本体固定＋オプション選択＋地域別据付費＋担当者/敬称切替＋採番</span>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <div class="row">
+          <div style="flex:1">
+            <label>宛名（会社名/氏名）</label>
+            <input id="toBase" type="text" placeholder="例：株式会社 豊建工 / 山田太郎" />
+          </div>
+          <div style="width:140px">
+            <label>敬称</label>
+            <select id="toHonorific">
+              <option value="御中">御中</option>
+              <option value="様">様</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:8px">
+          <div style="flex:1">
+            <label>見積番号（自動生成されます。必要なら編集可）</label>
+            <input id="quoteNo" type="text" />
+            <div class="muted" style="margin-top:4px">
+              形式：SEI+sai+日付(YYYYMMDD)+連番(3桁)（例：SEIsai20260109-001）
+            </div>
+          </div>
+          <div style="width:190px">
+            <label>発行日</label>
+            <input id="issueDate" type="date" />
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:8px">
+          <div style="flex:1">
+            <label>担当者</label>
+            <select id="tantouSelect" style="width:100%">
+              <option value="樋口大">樋口大</option>
+              <option value="巽隆充">巽隆充</option>
+              <option value="三谷剛史">三谷剛史</option>
+              <option value="山崎迅人">山崎迅人</option>
+              <option value="與那城昭彦">與那城昭彦</option>
+              <option value="八田雅隆">八田雅隆</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:8px">
+          <div style="flex:1">
+            <label>納期</label>
+            <input id="delivery" type="text" placeholder="例：受注後 約3カ月" />
+          </div>
+          <div style="flex:1">
+            <label>受渡場所</label>
+            <input id="place" type="text" placeholder="例：御社ご指定場所" />
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:8px">
+          <div style="flex:1">
+            <label>支払条件</label>
+            <input id="payment" type="text" placeholder="例：納入時 現金一括払い" />
+          </div>
+          <div style="flex:1">
+            <label>見積有効期限</label>
+            <input id="valid" type="text" placeholder="例：30日" />
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:8px">
+          <div style="flex:1">
+            <label>備考（自由記入）</label>
+            <textarea id="notes" placeholder="例：本見積書の有効期限は30日です。有効期限が切れた場合は、再見積となります。"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="opt-head">運送据付・セットアップ及び講習費用（精研直販・彩）</div>
+        <div class="row">
+          <div style="flex:1">
+            <label>地域</label>
+            <select id="region">
+              <option value="kinki">近畿（¥60,000）</option>
+              <option value="chugoku">中国（¥90,000）</option>
+              <option value="shikoku">四国（¥100,000）</option>
+              <option value="kyushu">九州（¥160,000）</option>
+              <option value="other">その他（要相談）</option>
+            </select>
+          </div>
+          <div style="width:180px">
+            <label>その他の金額（任意）</label>
+            <input id="regionOtherPrice" type="number" min="0" step="1000" placeholder="例：120000" disabled />
+            <div class="muted" style="margin-top:4px">
+              「その他」は金額空欄でもOK（要相談表示になります）
+            </div>
+          </div>
+        </div>
+
+        <div class="opt-head" style="margin-top:10px">オプション（初期OFF）</div>
+        <div class="opt-list" id="optList"></div>
+
+        <div class="row" style="margin-top:10px">
+          <div style="flex:1"></div>
+          <button onclick="applyAndRender()">明細を更新</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 印刷対象 -->
+  <div class="print-area">
+    <div class="paper">
+      <div class="header">
+        <div class="no" id="outNo">No.SEI----</div>
+        <div class="title">御 見 積 書</div>
+        <div class="date" id="outDate">令和 -- 年 -- 月 -- 日</div>
+      </div>
+
+      <div class="top-block">
+        <div class="to">
+          <div class="to-name" id="outTo">株式会社　＿＿＿＿　御中</div>
+        </div>
+
+        <div class="issuer">
+          <img class="inkan" src="inkan.png" alt="会社印"/>
+          <div class="issuer-name">株式会社 精研</div>
+          <div class="rowline"><div class="k">〒</div><div class="v">573-0102</div></div>
+          <div class="rowline"><div class="k"></div><div class="v">大阪府枚方市長尾家具町3-12-3</div></div>
+          <div class="rowline"><div class="k">TEL</div><div class="v">072-856-8253</div></div>
+          <div class="rowline"><div class="k">FAX</div><div class="v">072-856-8254</div></div>
+
+          <div class="tantou" id="outTantou">担当者　＿＿＿＿</div>
+        </div>
+      </div>
+
+      <div class="greeting">下記の通り、御見積申し上げます。</div>
+
+      <div class="summary">
+        <div class="sum-label">総金額</div>
+        <div class="sum-amount" id="outGrand">¥0 -</div>
+      </div>
+
+      <table class="cond">
+        <tr>
+          <td class="k">納期</td><td class="v" id="outDelivery">受注後 約3カ月</td>
+          <td class="k2">受渡場所</td><td id="outPlace">御社ご指定場所</td>
+        </tr>
+        <tr>
+          <td class="k">支払条件</td><td class="v" id="outPayment">納入時 現金一括払い</td>
+          <td class="k2">見積有効期限</td><td id="outValid">30日</td>
+        </tr>
+      </table>
+
+      <table class="items">
+        <thead>
+          <tr>
+            <th class="desc">品名及び仕様</th>
+            <th class="c-qty">数量</th>
+            <th class="c-unit">単価</th>
+            <th class="c-amt">金額</th>
+          </tr>
+        </thead>
+        <tbody id="outItems"></tbody>
+      </table>
+
+      <div class="bottom">
+        <div class="note-box" id="outNotes"></div>
+
+        <table class="totals">
+          <tr><td class="k">小計</td><td class="v" id="outSub">0</td></tr>
+          <tr><td class="k">消費税</td><td class="v" id="outTax">0</td></tr>
+          <tr><td class="k">合計</td><td class="v" id="outTotal">0</td></tr>
+        </table>
+      </div>
+
+      <div class="caution">
+        <div class="head">【注意事項】</div>
+        <ul>
+          <li>製品保証期間は納入日より1年間です。</li>
+          <li>保証延長サービス「安心サポート」の同時加入をお勧めしております。</li>
+          <li>WriterPlusはIllustratorからのベクトルデータ取込みはできません。</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+<script>
+  // ====== データ（彩専用） ======
+  const BASE_ITEM = {
+    name: 'タジマ1頭式8色刺繍機「TAJIMA彩」',
+    qty: 1,
+    unitPrice: 1100000
+  };
+
+  const MODEL_LINES = [
+    '型式：MDP-S0801C(200×300)S',
+    '標準付属：袋物枠 200×300、100×100 各1個付',
+    '標準付属：データ作成ソフト「WriterPlus」',
+    '標準付属：日本語フォント（楷書体、太ゴシック体）'
+  ];
+
+  // オプション一覧（価格表に合わせた登録例）
+  const OPTIONS = [
+    { id:'stand',   name:'脚スタンド：MDP-SC', price:137000, qty:false },
+    { id:'widecap', name:'ワイド帽子枠一式：MDP-SC', price:99000, qty:false },
+
+    { id:'tfa90',  name:'袋物枠：TFA：Φ90',  price:5000, qty:true },
+    { id:'tfa120', name:'袋物枠：TFA：Φ120', price:5000, qty:true },
+    { id:'tfa150', name:'袋物枠：TFA：Φ150', price:5000, qty:true },
+    { id:'tfa180', name:'袋物枠：TFA：Φ180', price:5000, qty:true },
+
+    { id:'pocket', name:'ポケット用クランプ枠：65×100', price:22000, qty:false },
+
+    { id:'kutsushita_bag', name:'靴下枠：袋物枠用', price:18000, qty:false },
+    { id:'kutsushita_gauge', name:'靴下枠用ゲージ：単品', price:5130, qty:true },
+
+    { id:'mstarter', name:'Mフレームスターターキット：彩', price:71000, qty:false },
+    { id:'mclip50',  name:'Mクリップ：50', price:4000, qty:true },
+    { id:'mclip100', name:'Mクリップ：100', price:6000, qty:true },
+
+    { id:'tgh3', name:'ゲージセット：TGH3', price:30000, qty:false },
+
+    { id:'shoeset', name:'靴枠セット', price:57000, qty:false },
+    { id:'hoop55', name:'フープマスター丸枠：5.5', price:57000, qty:false },
+
+    // 選択制（初期OFF）
+    { id:'bobbin_small', name:'下糸巻装置：小型', price:28000, qty:false },
+    { id:'anshin', name:'5年間あんしん定額サポート', price:132000, qty:false },
+
+    { id:'bag100', name:'袋物枠100×100（標準装備タイプ）', price:7000, qty:true },
+    { id:'bag200', name:'袋物枠200×300（標準装備タイプ）', price:7000, qty:true },
+
+    { id:'lan_add', name:'LAN刺繍機接続ライセンス 追加2台目以降', price:18000, qty:true },
+
+    { id:'wp_font_a', name:'Writerplusタジマ日本語フォント セットA', price:68000, qty:false },
+    { id:'wp_font_b', name:'Writerplusタジマ日本語フォント セットB', price:68000, qty:false },
+    { id:'wp_font_c', name:'Writerplusタジマ日本語フォント セットC', price:123000, qty:false }
+  ];
+
+  // 地域別（精研直販・彩）
+  const REGION_PRICE = {
+    kinki: 60000,
+    chugoku: 90000,
+    shikoku: 100000,
+    kyushu: 160000,
+    other: null
+  };
+
+  const TAX_RATE = 0.10;
+
+  // ====== UI生成 ======
+  function buildOptionUI(){
+    const wrap = document.getElementById('optList');
+    wrap.innerHTML = '';
+
+    const h1 = document.createElement('div'); h1.className='muted'; h1.textContent='選択';
+    const h2 = document.createElement('div'); h2.className='muted price'; h2.textContent='単価';
+    const h3 = document.createElement('div'); h3.className='muted'; h3.textContent='数量';
+    wrap.appendChild(h1); wrap.appendChild(h2); wrap.appendChild(h3);
+
+    OPTIONS.forEach(opt=>{
+      const left = document.createElement('div');
+      left.className='opt-name';
+      left.innerHTML = `<input type="checkbox" id="opt_${opt.id}"><label for="opt_${opt.id}">${opt.name}</label>`;
+
+      const mid = document.createElement('div');
+      mid.className='price';
+      mid.textContent = yen(opt.price);
+
+      const right = document.createElement('div');
+      if(opt.qty){
+        right.innerHTML = `<input class="qty" id="qty_${opt.id}" type="number" min="1" step="1" value="1" disabled>`;
+      }else{
+        right.innerHTML = `<span class="muted">1</span>`;
+      }
+
+      wrap.appendChild(left);
+      wrap.appendChild(mid);
+      wrap.appendChild(right);
+
+      const cb = left.querySelector('input[type="checkbox"]');
+      cb.addEventListener('change', ()=>{
+        if(opt.qty){
+          document.getElementById(`qty_${opt.id}`).disabled = !cb.checked;
+        }
+      });
+    });
+  }
+
+  // ====== 採番（SEI + sai + YYYYMMDD + -連番3桁） ======
+  function yyyymmdd(dateObj){
+    const y = dateObj.getFullYear();
+    const m = String(dateObj.getMonth()+1).padStart(2,'0');
+    const d = String(dateObj.getDate()).padStart(2,'0');
+    return `${y}${m}${d}`;
+  }
+
+  function nextSequenceForDate(dateStr){
+    // dateStr: YYYYMMDD
+    const key = `seiken_sai_seq_${dateStr}`;
+    const n = parseInt(localStorage.getItem(key) || '0', 10) + 1;
+    localStorage.setItem(key, String(n));
+    return n;
+  }
+
+  function formatSeq(n){
+    return String(n).padStart(3,'0');
+  }
+
+  function generateQuoteNoFromIssueDate(){
+    const iso = document.getElementById('issueDate').value;
+    const d = iso ? new Date(iso + 'T00:00:00') : new Date();
+    const ds = yyyymmdd(d);
+    const seq = nextSequenceForDate(ds);
+    return `SEIsai${ds}-${formatSeq(seq)}`;
+  }
+
+  function regenQuoteNo(){
+    document.getElementById('quoteNo').value = generateQuoteNoFromIssueDate();
+    applyAndRender();
+  }
+
+  // 発行日が変わったら、採番も作り直したい場合に備えて
+  function onIssueDateChange(){
+    // ここは「自動で再採番」か「手動で再生成」か迷いどころなので、
+    // 事故防止のため "自動再採番はしない" 方針にしています。
+    // 必要なら「見積番号を再生成」ボタンを押す運用にしてください。
+    applyAndRender();
+  }
+
+  // ====== 明細生成 ======
+  function getSelectedOptions(){
+    const items = [];
+    for(const opt of OPTIONS){
+      const cb = document.getElementById(`opt_${opt.id}`);
+      if(!cb || !cb.checked) continue;
+
+      let qty = 1;
+      if(opt.qty){
+        const q = document.getElementById(`qty_${opt.id}`);
+        qty = Math.max(1, parseInt(q.value || '1', 10));
+      }
+      items.push({
+        name: opt.name,
+        qty,
+        unitPrice: opt.price
+      });
+    }
+    return items;
+  }
+
+  function getRegionItem(){
+    const region = document.getElementById('region').value;
+    const fixed = REGION_PRICE[region];
+
+    if(fixed === null){
+      const v = document.getElementById('regionOtherPrice').value;
+      const price = v ? Math.max(0, parseInt(v,10)) : null;
+      return {
+        name: '運送据付・セットアップ及び講習費用（その他・要相談）',
+        qty: 1,
+        unitPrice: price
+      };
+    }else{
+      const mapName = { kinki:'近畿', chugoku:'中国', shikoku:'四国', kyushu:'九州' };
+      return {
+        name: `運送据付・セットアップ及び講習費用（${mapName[region]}）`,
+        qty: 1,
+        unitPrice: fixed
+      };
+    }
+  }
+
+  function buildLineItems(){
+    const lines = [];
+
+    // 本体（固定）
+    lines.push(BASE_ITEM);
+
+    // 注記行（単価・金額は空欄）
+    MODEL_LINES.forEach(t=>{
+      lines.push({ name: t, qty: '', unitPrice: '' });
+    });
+
+    // 選択オプション
+    getSelectedOptions().forEach(o=>lines.push(o));
+
+    // 据付費（地域）
+    lines.push(getRegionItem());
+
+    return lines;
+  }
+
+  // ====== 宛名の組み立て（御中/様） ======
+  function buildToText(){
+    const base = (document.getElementById('toBase').value || '').trim();
+    const honor = document.getElementById('toHonorific').value;
+
+    if(!base){
+      return `株式会社　＿＿＿＿　${honor}`;
+    }
+    return `${base}　${honor}`;
+  }
+
+  // ====== レンダリング ======
+  function applyAndRender(){
+    // region other input enable
+    const region = document.getElementById('region').value;
+    const other = document.getElementById('regionOtherPrice');
+    other.disabled = region !== 'other';
+
+    const quoteNo = (document.getElementById('quoteNo').value || '').trim() || 'SEIsai--------';
+    const issueDate = document.getElementById('issueDate').value;
+
+    const delivery = document.getElementById('delivery').value.trim() || '受注後 約3カ月';
+    const place = document.getElementById('place').value.trim() || '御社ご指定場所';
+    const payment = document.getElementById('payment').value.trim() || '納入時 現金一括払い';
+    const valid = document.getElementById('valid').value.trim() || '30日';
+
+    const notes = document.getElementById('notes').value.trim()
+      || '本見積書の有効期限は30日です。有効期限が切れた場合は、再見積となります。';
+
+    const tantou = document.getElementById('tantouSelect').value;
+
+    // 出力（宛名）
+    document.getElementById('outTo').textContent = buildToText();
+
+    // 見積番号（左上）
+    // ここは現状の見積書と同じく "No." を付けて表示
+    document.getElementById('outNo').textContent = `No.${quoteNo}`;
+
+    // 日付
+    document.getElementById('outDate').textContent = formatReiwa(issueDate);
+
+    // 条件
+    document.getElementById('outDelivery').textContent = delivery;
+    document.getElementById('outPlace').textContent = place;
+    document.getElementById('outPayment').textContent = payment;
+    document.getElementById('outValid').textContent = valid;
+
+    // 担当者
+    document.getElementById('outTantou').textContent = `担当者　${tantou}`;
+
+    // 備考
+    document.getElementById('outNotes').textContent = notes;
+
+    // 明細
+    const lines = buildLineItems();
+    const tbody = document.getElementById('outItems');
+    tbody.innerHTML = '';
+
+    let subtotal = 0;
+
+    lines.forEach(li=>{
+      const tr = document.createElement('tr');
+
+      const tdDesc = document.createElement('td');
+      tdDesc.className='desc';
+      tdDesc.textContent = li.name;
+
+      const tdQty = document.createElement('td');
+      tdQty.className='c-qty';
+      tdQty.textContent = li.qty;
+
+      const tdUnit = document.createElement('td');
+      tdUnit.className='c-unit';
+
+      const tdAmt = document.createElement('td');
+      tdAmt.className='c-amt';
+
+      if(typeof li.unitPrice === 'number'){
+        tdUnit.textContent = yen(li.unitPrice);
+        const amt = li.unitPrice * (li.qty || 1);
+        tdAmt.textContent = yen(amt);
+        subtotal += amt;
+      }else{
+        tdUnit.textContent = '';
+        tdAmt.textContent = '';
+      }
+
+      tr.appendChild(tdDesc);
+      tr.appendChild(tdQty);
+      tr.appendChild(tdUnit);
+      tr.appendChild(tdAmt);
+      tbody.appendChild(tr);
+    });
+
+    const tax = Math.round(subtotal * TAX_RATE);
+    const total = subtotal + tax;
+
+    document.getElementById('outSub').textContent = yen(subtotal);
+    document.getElementById('outTax').textContent = yen(tax);
+    document.getElementById('outTotal').textContent = yen(total);
+    document.getElementById('outGrand').textContent = `${yen(total)} -`;
+  }
+
+  function resetToSample(){
+    // 発行日：今日
+    const today = new Date();
+    document.getElementById('issueDate').valueAsDate = today;
+
+    // 採番：今日の連番で生成（初回でもOK）
+    document.getElementById('quoteNo').value = generateQuoteNoFromIssueDate();
+
+    // 宛名：サンプル
+    document.getElementById('toBase').value = '株式会社 豊建工';
+    document.getElementById('toHonorific').value = '御中';
+
+    // 担当者：サンプル（必要なら変更）
+    document.getElementById('tantouSelect').value = '八田雅隆';
+
+    // 条件
+    document.getElementById('delivery').value = '受注後 約3カ月';
+    document.getElementById('place').value = '御社ご指定場所';
+    document.getElementById('payment').value = '納入時 現金一括支払い';
+    document.getElementById('valid').value = '30日';
+
+    document.getElementById('notes').value =
+      '本見積書の有効期限は30日です。有効期限が切れた場合は、再見積となります。';
+
+    // 地域：近畿
+    document.getElementById('region').value = 'kinki';
+    document.getElementById('regionOtherPrice').value = '';
+
+    // オプション：全部OFF
+    OPTIONS.forEach(o=>{
+      const cb = document.getElementById(`opt_${o.id}`);
+      if(cb) cb.checked = false;
+      if(o.qty){
+        const q = document.getElementById(`qty_${o.id}`);
+        if(q){ q.value = 1; q.disabled = true; }
+      }
+    });
+
+    // サンプルで少しON（例）
+    ['mstarter','shoeset'].forEach(id=>{
+      const cb = document.getElementById(`opt_${id}`);
+      if(cb) cb.checked = true;
+    });
+
+    applyAndRender();
+  }
+
+  // ====== util ======
+  function yen(n){
+    return '¥' + Number(n).toLocaleString('ja-JP');
+  }
+
+  function formatReiwa(iso){
+    if(!iso){
+      return '令和 -- 年 -- 月 -- 日';
+    }
+    const d = new Date(iso + 'T00:00:00');
+    const y = d.getFullYear();
+    const m = d.getMonth()+1;
+    const day = d.getDate();
+    const reiwa = y - 2018; // 2019=令和1
+    return `令和 ${reiwa} 年 ${m} 月 ${day} 日`;
+  }
+
+  // ====== 起動 ======
+  buildOptionUI();
+
+  document.getElementById('region').addEventListener('change', ()=>{
+    const region = document.getElementById('region').value;
+    document.getElementById('regionOtherPrice').disabled = region !== 'other';
+    applyAndRender();
+  });
+
+  document.getElementById('regionOtherPrice').addEventListener('input', applyAndRender);
+  document.getElementById('toBase').addEventListener('input', applyAndRender);
+  document.getElementById('toHonorific').addEventListener('change', applyAndRender);
+  document.getElementById('tantouSelect').addEventListener('change', applyAndRender);
+
+  document.getElementById('delivery').addEventListener('input', applyAndRender);
+  document.getElementById('place').addEventListener('input', applyAndRender);
+  document.getElementById('payment').addEventListener('input', applyAndRender);
+  document.getElementById('valid').addEventListener('input', applyAndRender);
+  document.getElementById('notes').addEventListener('input', applyAndRender);
+
+  document.getElementById('issueDate').addEventListener('change', onIssueDateChange);
+
+  // 初期化
+  resetToSample();
+</script>
+
+</body>
+</html>
