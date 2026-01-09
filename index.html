@@ -2,81 +2,130 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>見積書作成（彩専用）</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <title>SEIKEN Sai Quote（彩 見積書）</title>
+
+  <!-- PDFダウンロード（任意）：ネット接続がある環境なら「PDF生成」ボタンで直接PDF保存できます -->
+  <script defer src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 
   <style>
     :root{
       --border:#333;
       --thin:1px;
+      --bg:#fafafa;
+      --card:#fff;
     }
 
     body{
       font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
-      margin: 16px;
+      margin: 12px;
       color:#111;
+      background: var(--bg);
     }
 
-    /* 画面：入力UI */
+    /* ===== 画面：入力UI ===== */
+    .app-head{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      margin-bottom:10px;
+    }
+    .app-title{
+      font-weight:900;
+      letter-spacing: .5px;
+    }
+    .app-sub{
+      font-size:12px;
+      color:#666;
+      margin-top:2px;
+    }
+
     .toolbar{
       display:flex; gap:8px; flex-wrap:wrap;
-      align-items:center; margin-bottom:12px;
+      align-items:center;
+      margin-bottom:10px;
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      background: var(--bg);
+      padding: 8px 0;
     }
+
+    .btn{
+      border:1px solid #ddd;
+      background:#fff;
+      border-radius:10px;
+      padding:8px 10px;
+      font-size: 13px;
+      cursor:pointer;
+    }
+    .btn.primary{
+      border-color:#111;
+      font-weight:800;
+    }
+
     .card{
-      border:1px solid #ddd; border-radius:10px;
+      border:1px solid #ddd; border-radius:12px;
+      background: var(--card);
       padding:12px; margin-bottom:12px;
+      box-shadow: 0 1px 0 rgba(0,0,0,.02);
     }
+
     .grid{
       display:grid;
       grid-template-columns: 1fr 1fr;
       gap:12px;
     }
+
     .row{
       display:flex; gap:8px; align-items:center; flex-wrap:wrap;
     }
-    label{ font-size: 13px; }
-    input, select, textarea, button{
-      font-size: 13px;
-      padding:6px 8px;
+
+    label{ font-size: 13px; font-weight:700; }
+    input, select, textarea{
+      font-size: 14px;
+      padding:8px 10px;
+      border:1px solid #ddd;
+      border-radius:10px;
+      background:#fff;
     }
-    input[type="text"], textarea{
-      width: 100%;
-      box-sizing:border-box;
-    }
-    textarea{ min-height: 52px; }
+
+    input[type="text"], textarea{ width: 100%; box-sizing:border-box; }
+    textarea{ min-height: 60px; }
+
+    .muted{ color:#666; font-size:12px; line-height:1.4; }
+    .price{ text-align:right; font-variant-numeric: tabular-nums; }
+    .qty{ width: 78px; }
 
     .opt-list{
       display:grid;
-      grid-template-columns: 1fr 120px 80px;
+      grid-template-columns: 1fr 120px 86px;
       gap:6px 8px;
       align-items:center;
     }
     .opt-head{
-      font-weight:700;
-      border-bottom:1px solid #ddd;
-      padding-bottom:6px;
-      margin-bottom:6px;
+      font-weight:900;
+      border-bottom:1px solid #eee;
+      padding-bottom:8px;
+      margin-bottom:8px;
     }
     .opt-name{
       display:flex; align-items:center; gap:8px;
     }
-    .price{
-      text-align:right;
-      font-variant-numeric: tabular-nums;
-    }
-    .qty{
-      width:70px;
-    }
-    .muted{ color:#666; font-size:12px; }
 
-    /* 印刷：見積書エリアだけ表示 */
+    /* スマホ対応 */
+    @media (max-width: 980px){
+      .grid{ grid-template-columns: 1fr; }
+      .toolbar{ gap:6px; }
+    }
+
+    /* ===== 印刷：見積書エリアだけ表示 ===== */
     @media print{
-      body{ margin:0; }
+      body{ margin:0; background:#fff; }
       .no-print{ display:none !important; }
-      .print-area{
-        margin:0;
-        padding:0;
-      }
+      .print-area{ margin:0; padding:0; }
     }
 
     /* ===== 見積書（A4） ===== */
@@ -84,12 +133,12 @@
       max-width: 210mm;
       margin: 0 auto;
     }
-
     .paper{
       width: 210mm;
       min-height: 297mm;
       padding: 10mm 12mm;
       box-sizing: border-box;
+      background:#fff;
     }
 
     .header{
@@ -122,12 +171,9 @@
       align-items:start;
     }
 
-    /* 宛名 */
-    .to{
-      padding-top: 2mm;
-    }
+    .to{ padding-top: 2mm; }
     .to-name{
-      font-size: 21px;              /* 宛名：大きめ */
+      font-size: 21px;
       font-weight: 800;
       display:inline-block;
       padding-bottom: 2mm;
@@ -135,13 +181,12 @@
       min-width: 115mm;
     }
 
-    /* 発行者（精研） */
     .issuer{
       border: var(--thin) solid var(--border);
       padding: 3mm;
       box-sizing: border-box;
       font-size: 11px;
-      position: relative; /* 印鑑の絶対配置 */
+      position: relative;
     }
     .issuer-name{
       font-weight: 900;
@@ -164,7 +209,6 @@
       font-weight: 700;
     }
 
-    /* 会社印 */
     .inkan{
       position:absolute;
       right: 5mm;
@@ -174,7 +218,6 @@
       opacity: 0.95;
     }
 
-    /* 「下記の通り…」は総金額のところにだけ出す */
     .greeting{
       margin-top: 4mm;
       font-size: 12px;
@@ -202,7 +245,6 @@
       font-variant-numeric: tabular-nums;
     }
 
-    /* 条件欄 */
     .cond{
       margin-top: 4mm;
       border: var(--thin) solid var(--border);
@@ -219,7 +261,6 @@
     .cond .v{ width: 60mm; }
     .cond .k2{ width: 22mm; font-weight: 800; background:#f7f7f7; }
 
-    /* 明細表 */
     .items{
       margin-top: 4mm;
       border: var(--thin) solid var(--border);
@@ -240,7 +281,6 @@
     .items .c-amt{ width: 28mm; text-align:right; }
     .items .desc{ width:auto; }
 
-    /* 下段：備考と小計 */
     .bottom{
       margin-top: 4mm;
       display:grid;
@@ -276,7 +316,6 @@
       font-weight: 900;
     }
 
-    /* 注意事項 */
     .caution{
       margin-top: 4mm;
       border-top: var(--thin) solid var(--border);
@@ -297,13 +336,23 @@
 
 <body>
 
-  <!-- 入力UI（画面だけ。印刷時は非表示） -->
   <div class="no-print">
+    <div class="app-head">
+      <div>
+        <div class="app-title">SEIKEN Sai Quote</div>
+        <div class="app-sub">彩専用 見積書（スマホ/タブレット運用を想定）</div>
+      </div>
+      <div class="muted" style="text-align:right">
+        目的：作成 → PDF化 → 送信
+      </div>
+    </div>
+
     <div class="toolbar">
-      <button onclick="window.print()">印刷 / PDF保存</button>
-      <button onclick="resetToSample()">サンプルに戻す</button>
-      <button onclick="regenQuoteNo()">見積番号を再生成</button>
-      <span class="muted">彩専用：本体固定＋オプション選択＋地域別据付費＋担当者/敬称切替＋採番</span>
+      <button class="btn primary" onclick="window.print()">印刷 / PDF保存（推奨）</button>
+      <button class="btn" onclick="downloadPDF()">PDF生成（ダウンロード）</button>
+      <button class="btn" onclick="resetToSample()">サンプルに戻す</button>
+      <button class="btn" onclick="regenQuoteNo()">見積番号を再生成</button>
+      <span class="muted">※「PDF生成」は端末/ブラウザにより品質差があります。提出用途は「印刷/PDF保存」を推奨。</span>
     </div>
 
     <div class="grid">
@@ -322,11 +371,11 @@
           </div>
         </div>
 
-        <div class="row" style="margin-top:8px">
+        <div class="row" style="margin-top:10px">
           <div style="flex:1">
-            <label>見積番号（自動生成されます。必要なら編集可）</label>
+            <label>見積番号（自動生成。必要なら編集可）</label>
             <input id="quoteNo" type="text" />
-            <div class="muted" style="margin-top:4px">
+            <div class="muted" style="margin-top:6px">
               形式：SEI+sai+日付(YYYYMMDD)+連番(3桁)（例：SEIsai20260109-001）
             </div>
           </div>
@@ -336,7 +385,7 @@
           </div>
         </div>
 
-        <div class="row" style="margin-top:8px">
+        <div class="row" style="margin-top:10px">
           <div style="flex:1">
             <label>担当者</label>
             <select id="tantouSelect" style="width:100%">
@@ -350,7 +399,7 @@
           </div>
         </div>
 
-        <div class="row" style="margin-top:8px">
+        <div class="row" style="margin-top:10px">
           <div style="flex:1">
             <label>納期</label>
             <input id="delivery" type="text" placeholder="例：受注後 約3カ月" />
@@ -361,7 +410,7 @@
           </div>
         </div>
 
-        <div class="row" style="margin-top:8px">
+        <div class="row" style="margin-top:10px">
           <div style="flex:1">
             <label>支払条件</label>
             <input id="payment" type="text" placeholder="例：納入時 現金一括払い" />
@@ -372,7 +421,7 @@
           </div>
         </div>
 
-        <div class="row" style="margin-top:8px">
+        <div class="row" style="margin-top:10px">
           <div style="flex:1">
             <label>備考（自由記入）</label>
             <textarea id="notes" placeholder="例：本見積書の有効期限は30日です。有効期限が切れた場合は、再見積となります。"></textarea>
@@ -381,7 +430,18 @@
       </div>
 
       <div class="card">
-        <div class="opt-head">運送据付・セットアップ及び講習費用（精研直販・彩）</div>
+        <div class="opt-head">本体（彩）</div>
+        <div class="row">
+          <div style="flex:1" class="muted">
+            タジマ1頭式8色刺繍機「TAJIMA彩」／単価：¥1,100,000（固定）
+          </div>
+          <div style="width:150px">
+            <label>数量</label>
+            <input id="baseQty" class="qty" type="number" min="1" step="1" value="1" />
+          </div>
+        </div>
+
+        <div class="opt-head" style="margin-top:14px">運送据付・セットアップ及び講習費用（精研直販・彩）</div>
         <div class="row">
           <div style="flex:1">
             <label>地域</label>
@@ -396,26 +456,36 @@
           <div style="width:180px">
             <label>その他の金額（任意）</label>
             <input id="regionOtherPrice" type="number" min="0" step="1000" placeholder="例：120000" disabled />
-            <div class="muted" style="margin-top:4px">
-              「その他」は金額空欄でもOK（要相談表示になります）
+            <div class="muted" style="margin-top:6px">
+              「その他」は金額空欄でもOK（要相談表示）
             </div>
           </div>
         </div>
 
-        <div class="opt-head" style="margin-top:10px">オプション（初期OFF）</div>
+        <div class="opt-head" style="margin-top:14px">オプション（数量を全て変更可）</div>
         <div class="opt-list" id="optList"></div>
 
-        <div class="row" style="margin-top:10px">
+        <div class="row" style="margin-top:12px">
           <div style="flex:1"></div>
-          <button onclick="applyAndRender()">明細を更新</button>
+          <button class="btn" onclick="applyAndRender()">明細を更新</button>
         </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="opt-head">スマホ／タブレットで「PDF化 → 送信」する手順（現実的な運用）</div>
+      <div class="muted">
+        1) まず「印刷 / PDF保存」を押す（これが一番きれいに出ます）<br/>
+        2) iPhone/iPad：プレビュー画面で共有ボタン →「ファイルに保存」または「メール/LINE等へ送信」<br/>
+        3) Android：印刷先を「PDFに保存」→ 共有<br/>
+        ※ ブラウザがSafari/Chromeでも概ね同じです。
       </div>
     </div>
   </div>
 
   <!-- 印刷対象 -->
   <div class="print-area">
-    <div class="paper">
+    <div class="paper" id="paper">
       <div class="header">
         <div class="no" id="outNo">No.SEI----</div>
         <div class="title">御 見 積 書</div>
@@ -434,7 +504,6 @@
           <div class="rowline"><div class="k"></div><div class="v">大阪府枚方市長尾家具町3-12-3</div></div>
           <div class="rowline"><div class="k">TEL</div><div class="v">072-856-8253</div></div>
           <div class="rowline"><div class="k">FAX</div><div class="v">072-856-8254</div></div>
-
           <div class="tantou" id="outTantou">担当者　＿＿＿＿</div>
         </div>
       </div>
@@ -494,7 +563,6 @@
   // ====== データ（彩専用） ======
   const BASE_ITEM = {
     name: 'タジマ1頭式8色刺繍機「TAJIMA彩」',
-    qty: 1,
     unitPrice: 1100000
   };
 
@@ -505,42 +573,41 @@
     '標準付属：日本語フォント（楷書体、太ゴシック体）'
   ];
 
-  // オプション一覧（価格表に合わせた登録例）
+  // オプション一覧（数量は全て変更可）
   const OPTIONS = [
-    { id:'stand',   name:'脚スタンド：MDP-SC', price:137000, qty:false },
-    { id:'widecap', name:'ワイド帽子枠一式：MDP-SC', price:99000, qty:false },
+    { id:'stand',   name:'脚スタンド：MDP-SC', price:137000 },
+    { id:'widecap', name:'ワイド帽子枠一式：MDP-SC', price:99000 },
 
-    { id:'tfa90',  name:'袋物枠：TFA：Φ90',  price:5000, qty:true },
-    { id:'tfa120', name:'袋物枠：TFA：Φ120', price:5000, qty:true },
-    { id:'tfa150', name:'袋物枠：TFA：Φ150', price:5000, qty:true },
-    { id:'tfa180', name:'袋物枠：TFA：Φ180', price:5000, qty:true },
+    { id:'tfa90',  name:'袋物枠：TFA：Φ90',  price:5000 },
+    { id:'tfa120', name:'袋物枠：TFA：Φ120', price:5000 },
+    { id:'tfa150', name:'袋物枠：TFA：Φ150', price:5000 },
+    { id:'tfa180', name:'袋物枠：TFA：Φ180', price:5000 },
 
-    { id:'pocket', name:'ポケット用クランプ枠：65×100', price:22000, qty:false },
+    { id:'pocket', name:'ポケット用クランプ枠：65×100', price:22000 },
 
-    { id:'kutsushita_bag', name:'靴下枠：袋物枠用', price:18000, qty:false },
-    { id:'kutsushita_gauge', name:'靴下枠用ゲージ：単品', price:5130, qty:true },
+    { id:'kutsushita_bag', name:'靴下枠：袋物枠用', price:18000 },
+    { id:'kutsushita_gauge', name:'靴下枠用ゲージ：単品', price:5130 },
 
-    { id:'mstarter', name:'Mフレームスターターキット：彩', price:71000, qty:false },
-    { id:'mclip50',  name:'Mクリップ：50', price:4000, qty:true },
-    { id:'mclip100', name:'Mクリップ：100', price:6000, qty:true },
+    { id:'mstarter', name:'Mフレームスターターキット：彩', price:71000 },
+    { id:'mclip50',  name:'Mクリップ：50', price:4000 },
+    { id:'mclip100', name:'Mクリップ：100', price:6000 },
 
-    { id:'tgh3', name:'ゲージセット：TGH3', price:30000, qty:false },
+    { id:'tgh3', name:'ゲージセット：TGH3', price:30000 },
 
-    { id:'shoeset', name:'靴枠セット', price:57000, qty:false },
-    { id:'hoop55', name:'フープマスター丸枠：5.5', price:57000, qty:false },
+    { id:'shoeset', name:'靴枠セット', price:57000 },
+    { id:'hoop55', name:'フープマスター丸枠：5.5', price:57000 },
 
-    // 選択制（初期OFF）
-    { id:'bobbin_small', name:'下糸巻装置：小型', price:28000, qty:false },
-    { id:'anshin', name:'5年間あんしん定額サポート', price:132000, qty:false },
+    { id:'bobbin_small', name:'下糸巻装置：小型', price:28000 },
+    { id:'anshin', name:'5年間あんしん定額サポート', price:132000 },
 
-    { id:'bag100', name:'袋物枠100×100（標準装備タイプ）', price:7000, qty:true },
-    { id:'bag200', name:'袋物枠200×300（標準装備タイプ）', price:7000, qty:true },
+    { id:'bag100', name:'袋物枠100×100（標準装備タイプ）', price:7000 },
+    { id:'bag200', name:'袋物枠200×300（標準装備タイプ）', price:7000 },
 
-    { id:'lan_add', name:'LAN刺繍機接続ライセンス 追加2台目以降', price:18000, qty:true },
+    { id:'lan_add', name:'LAN刺繍機接続ライセンス 追加2台目以降', price:18000 },
 
-    { id:'wp_font_a', name:'Writerplusタジマ日本語フォント セットA', price:68000, qty:false },
-    { id:'wp_font_b', name:'Writerplusタジマ日本語フォント セットB', price:68000, qty:false },
-    { id:'wp_font_c', name:'Writerplusタジマ日本語フォント セットC', price:123000, qty:false }
+    { id:'wp_font_a', name:'Writerplusタジマ日本語フォント セットA', price:68000 },
+    { id:'wp_font_b', name:'Writerplusタジマ日本語フォント セットB', price:68000 },
+    { id:'wp_font_c', name:'Writerplusタジマ日本語フォント セットC', price:123000 }
   ];
 
   // 地域別（精研直販・彩）
@@ -567,18 +634,15 @@
     OPTIONS.forEach(opt=>{
       const left = document.createElement('div');
       left.className='opt-name';
-      left.innerHTML = `<input type="checkbox" id="opt_${opt.id}"><label for="opt_${opt.id}">${opt.name}</label>`;
+      left.innerHTML = `<input type="checkbox" id="opt_${opt.id}">
+                        <label for="opt_${opt.id}">${opt.name}</label>`;
 
       const mid = document.createElement('div');
       mid.className='price';
       mid.textContent = yen(opt.price);
 
       const right = document.createElement('div');
-      if(opt.qty){
-        right.innerHTML = `<input class="qty" id="qty_${opt.id}" type="number" min="1" step="1" value="1" disabled>`;
-      }else{
-        right.innerHTML = `<span class="muted">1</span>`;
-      }
+      right.innerHTML = `<input class="qty" id="qty_${opt.id}" type="number" min="1" step="1" value="1" disabled>`;
 
       wrap.appendChild(left);
       wrap.appendChild(mid);
@@ -586,10 +650,11 @@
 
       const cb = left.querySelector('input[type="checkbox"]');
       cb.addEventListener('change', ()=>{
-        if(opt.qty){
-          document.getElementById(`qty_${opt.id}`).disabled = !cb.checked;
-        }
+        document.getElementById(`qty_${opt.id}`).disabled = !cb.checked;
+        applyAndRender();
       });
+
+      document.getElementById(`qty_${opt.id}`).addEventListener('input', applyAndRender);
     });
   }
 
@@ -602,16 +667,13 @@
   }
 
   function nextSequenceForDate(dateStr){
-    // dateStr: YYYYMMDD
     const key = `seiken_sai_seq_${dateStr}`;
     const n = parseInt(localStorage.getItem(key) || '0', 10) + 1;
     localStorage.setItem(key, String(n));
     return n;
   }
 
-  function formatSeq(n){
-    return String(n).padStart(3,'0');
-  }
+  function formatSeq(n){ return String(n).padStart(3,'0'); }
 
   function generateQuoteNoFromIssueDate(){
     const iso = document.getElementById('issueDate').value;
@@ -626,11 +688,8 @@
     applyAndRender();
   }
 
-  // 発行日が変わったら、採番も作り直したい場合に備えて
   function onIssueDateChange(){
-    // ここは「自動で再採番」か「手動で再生成」か迷いどころなので、
-    // 事故防止のため "自動再採番はしない" 方針にしています。
-    // 必要なら「見積番号を再生成」ボタンを押す運用にしてください。
+    // 自動再採番はしない（事故防止）
     applyAndRender();
   }
 
@@ -641,16 +700,10 @@
       const cb = document.getElementById(`opt_${opt.id}`);
       if(!cb || !cb.checked) continue;
 
-      let qty = 1;
-      if(opt.qty){
-        const q = document.getElementById(`qty_${opt.id}`);
-        qty = Math.max(1, parseInt(q.value || '1', 10));
-      }
-      items.push({
-        name: opt.name,
-        qty,
-        unitPrice: opt.price
-      });
+      const q = document.getElementById(`qty_${opt.id}`);
+      const qty = Math.max(1, parseInt(q.value || '1', 10));
+
+      items.push({ name: opt.name, qty, unitPrice: opt.price });
     }
     return items;
   }
@@ -680,16 +733,15 @@
   function buildLineItems(){
     const lines = [];
 
-    // 本体（固定）
-    lines.push(BASE_ITEM);
+    // 本体（数量可変）
+    const baseQty = Math.max(1, parseInt(document.getElementById('baseQty').value || '1', 10));
+    lines.push({ name: BASE_ITEM.name, qty: baseQty, unitPrice: BASE_ITEM.unitPrice });
 
     // 注記行（単価・金額は空欄）
-    MODEL_LINES.forEach(t=>{
-      lines.push({ name: t, qty: '', unitPrice: '' });
-    });
+    MODEL_LINES.forEach(t=> lines.push({ name: t, qty: '', unitPrice: '' }));
 
     // 選択オプション
-    getSelectedOptions().forEach(o=>lines.push(o));
+    getSelectedOptions().forEach(o=> lines.push(o));
 
     // 据付費（地域）
     lines.push(getRegionItem());
@@ -697,20 +749,16 @@
     return lines;
   }
 
-  // ====== 宛名の組み立て（御中/様） ======
+  // ====== 宛名（御中/様） ======
   function buildToText(){
     const base = (document.getElementById('toBase').value || '').trim();
     const honor = document.getElementById('toHonorific').value;
-
-    if(!base){
-      return `株式会社　＿＿＿＿　${honor}`;
-    }
+    if(!base) return `株式会社　＿＿＿＿　${honor}`;
     return `${base}　${honor}`;
   }
 
   // ====== レンダリング ======
   function applyAndRender(){
-    // region other input enable
     const region = document.getElementById('region').value;
     const other = document.getElementById('regionOtherPrice');
     other.disabled = region !== 'other';
@@ -728,29 +776,18 @@
 
     const tantou = document.getElementById('tantouSelect').value;
 
-    // 出力（宛名）
     document.getElementById('outTo').textContent = buildToText();
-
-    // 見積番号（左上）
-    // ここは現状の見積書と同じく "No." を付けて表示
     document.getElementById('outNo').textContent = `No.${quoteNo}`;
-
-    // 日付
     document.getElementById('outDate').textContent = formatReiwa(issueDate);
 
-    // 条件
     document.getElementById('outDelivery').textContent = delivery;
     document.getElementById('outPlace').textContent = place;
     document.getElementById('outPayment').textContent = payment;
     document.getElementById('outValid').textContent = valid;
 
-    // 担当者
     document.getElementById('outTantou').textContent = `担当者　${tantou}`;
-
-    // 備考
     document.getElementById('outNotes').textContent = notes;
 
-    // 明細
     const lines = buildLineItems();
     const tbody = document.getElementById('outItems');
     tbody.innerHTML = '';
@@ -776,7 +813,8 @@
 
       if(typeof li.unitPrice === 'number'){
         tdUnit.textContent = yen(li.unitPrice);
-        const amt = li.unitPrice * (li.qty || 1);
+        const qty = (typeof li.qty === 'number') ? li.qty : 1;
+        const amt = li.unitPrice * qty;
         tdAmt.textContent = yen(amt);
         subtotal += amt;
       }else{
@@ -801,21 +839,15 @@
   }
 
   function resetToSample(){
-    // 発行日：今日
     const today = new Date();
     document.getElementById('issueDate').valueAsDate = today;
-
-    // 採番：今日の連番で生成（初回でもOK）
     document.getElementById('quoteNo').value = generateQuoteNoFromIssueDate();
 
-    // 宛名：サンプル
     document.getElementById('toBase').value = '株式会社 豊建工';
     document.getElementById('toHonorific').value = '御中';
 
-    // 担当者：サンプル（必要なら変更）
     document.getElementById('tantouSelect').value = '八田雅隆';
 
-    // 条件
     document.getElementById('delivery').value = '受注後 約3カ月';
     document.getElementById('place').value = '御社ご指定場所';
     document.getElementById('payment').value = '納入時 現金一括支払い';
@@ -824,56 +856,95 @@
     document.getElementById('notes').value =
       '本見積書の有効期限は30日です。有効期限が切れた場合は、再見積となります。';
 
-    // 地域：近畿
+    // 本体数量（例：1）
+    document.getElementById('baseQty').value = 1;
+
     document.getElementById('region').value = 'kinki';
     document.getElementById('regionOtherPrice').value = '';
 
-    // オプション：全部OFF
+    // オプション初期OFF
     OPTIONS.forEach(o=>{
       const cb = document.getElementById(`opt_${o.id}`);
       if(cb) cb.checked = false;
-      if(o.qty){
-        const q = document.getElementById(`qty_${o.id}`);
-        if(q){ q.value = 1; q.disabled = true; }
-      }
+      const q = document.getElementById(`qty_${o.id}`);
+      if(q){ q.value = 1; q.disabled = true; }
     });
 
     // サンプルで少しON（例）
     ['mstarter','shoeset'].forEach(id=>{
       const cb = document.getElementById(`opt_${id}`);
-      if(cb) cb.checked = true;
+      const q = document.getElementById(`qty_${id}`);
+      if(cb){ cb.checked = true; }
+      if(q){ q.disabled = false; q.value = 1; }
     });
 
     applyAndRender();
   }
 
-  // ====== util ======
-  function yen(n){
-    return '¥' + Number(n).toLocaleString('ja-JP');
+  // ====== PDF生成（ダウンロード） ======
+  async function downloadPDF(){
+    // 依存ライブラリが読み込めない環境（オフライン等）の場合は、印刷/PDF保存に誘導
+    if(!window.html2canvas || !window.jspdf){
+      alert('PDF生成（ダウンロード）はネット接続が必要です。\n「印刷 / PDF保存（推奨）」をご利用ください。');
+      return;
+    }
+
+    // 念のため最新反映
+    applyAndRender();
+
+    const el = document.getElementById('paper');
+    const canvas = await window.html2canvas(el, { scale: 2, useCORS: true });
+    const imgData = canvas.toDataURL('image/png');
+
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+    // A4: 210 × 297
+    const pageW = 210;
+    const pageH = 297;
+
+    // 画像の縦横比を保ってフィット
+    const imgW = pageW;
+    const imgH = canvas.height * (imgW / canvas.width);
+
+    if(imgH <= pageH){
+      pdf.addImage(imgData, 'PNG', 0, 0, imgW, imgH);
+    }else{
+      // 1ページに収まらない場合（通常は起きにくい）— 2ページ分割
+      let y = 0;
+      let remaining = imgH;
+
+      while(remaining > 0){
+        pdf.addImage(imgData, 'PNG', 0, -y, imgW, imgH);
+        remaining -= pageH;
+        y += pageH;
+        if(remaining > 0) pdf.addPage();
+      }
+    }
+
+    const qn = (document.getElementById('quoteNo').value || 'SEIsai').replace(/[^A-Za-z0-9\-_.]/g,'');
+    pdf.save(`${qn}.pdf`);
   }
 
+  // ====== util ======
+  function yen(n){ return '¥' + Number(n).toLocaleString('ja-JP'); }
+
   function formatReiwa(iso){
-    if(!iso){
-      return '令和 -- 年 -- 月 -- 日';
-    }
+    if(!iso) return '令和 -- 年 -- 月 -- 日';
     const d = new Date(iso + 'T00:00:00');
     const y = d.getFullYear();
     const m = d.getMonth()+1;
     const day = d.getDate();
-    const reiwa = y - 2018; // 2019=令和1
+    const reiwa = y - 2018;
     return `令和 ${reiwa} 年 ${m} 月 ${day} 日`;
   }
 
   // ====== 起動 ======
   buildOptionUI();
 
-  document.getElementById('region').addEventListener('change', ()=>{
-    const region = document.getElementById('region').value;
-    document.getElementById('regionOtherPrice').disabled = region !== 'other';
-    applyAndRender();
-  });
-
+  document.getElementById('region').addEventListener('change', ()=>{ applyAndRender(); });
   document.getElementById('regionOtherPrice').addEventListener('input', applyAndRender);
+
   document.getElementById('toBase').addEventListener('input', applyAndRender);
   document.getElementById('toHonorific').addEventListener('change', applyAndRender);
   document.getElementById('tantouSelect').addEventListener('change', applyAndRender);
@@ -885,6 +956,7 @@
   document.getElementById('notes').addEventListener('input', applyAndRender);
 
   document.getElementById('issueDate').addEventListener('change', onIssueDateChange);
+  document.getElementById('baseQty').addEventListener('input', applyAndRender);
 
   // 初期化
   resetToSample();
