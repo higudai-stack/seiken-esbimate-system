@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
-  <title>SEIKEN Sai Quote（彩 見積書）</title>
+  <title>精研 見積アプリ（彩）</title>
 
   <!-- PDFダウンロード（任意）：ネット接続がある環境なら「PDF生成」ボタンで直接PDF保存できます -->
   <script defer src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -114,6 +114,9 @@
     .opt-name{
       display:flex; align-items:center; gap:8px;
     }
+
+    .neg{ color:#b00000; }
+    .neg-input{ color:#b00000; }
 
     /* スマホ対応 */
     @media (max-width: 980px){
@@ -339,7 +342,7 @@
   <div class="no-print">
     <div class="app-head">
       <div>
-        <div class="app-title">SEIKEN Sai Quote</div>
+        <div class="app-title">精研 見積アプリ（彩）</div>
         <div class="app-sub">彩専用 見積書（スマホ/タブレット運用を想定）</div>
       </div>
       <div class="muted" style="text-align:right">
@@ -350,7 +353,7 @@
     <div class="toolbar">
       <button class="btn primary" onclick="window.print()">印刷 / PDF保存（推奨）</button>
       <button class="btn" onclick="downloadPDF()">PDF生成（ダウンロード）</button>
-      <button class="btn" onclick="resetToSample()">サンプルに戻す</button>
+      <button class="btn" onclick="resetAll()">全入力リセット</button>
       <button class="btn" onclick="regenQuoteNo()">見積番号を再生成</button>
       <span class="muted">※「PDF生成」は端末/ブラウザにより品質差があります。提出用途は「印刷/PDF保存」を推奨。</span>
     </div>
@@ -375,9 +378,7 @@
           <div style="flex:1">
             <label>見積番号（自動生成。必要なら編集可）</label>
             <input id="quoteNo" type="text" />
-            <div class="muted" style="margin-top:6px">
-              形式：SEI+sai+日付(YYYYMMDD)+連番(3桁)（例：SEIsai20260109-001）
-            </div>
+           
           </div>
           <div style="width:190px">
             <label>発行日</label>
@@ -389,7 +390,8 @@
           <div style="flex:1">
             <label>担当者</label>
             <select id="tantouSelect" style="width:100%">
-              <option value="樋口大">樋口大</option>
+              
+              <option value="" selected>選択してください</option><option value="樋口大">樋口大</option>
               <option value="巽隆充">巽隆充</option>
               <option value="三谷剛史">三谷剛史</option>
               <option value="山崎迅人">山崎迅人</option>
@@ -656,6 +658,55 @@
 
       document.getElementById(`qty_${opt.id}`).addEventListener('input', applyAndRender);
     });
+  
+    // --- その他（任意） ---
+    const leftO = document.createElement('div');
+    leftO.className='opt-name';
+    leftO.innerHTML = `
+      <input type="checkbox" id="opt_other">
+      <label for="opt_other">その他（任意）</label>
+      <input id="otherName" type="text" placeholder="内容" style="flex:1; min-width:160px;" disabled>
+    `;
+
+    const midO = document.createElement('div');
+    midO.className='price';
+    midO.innerHTML = `<input id="otherPrice" type="number" step="1000" placeholder="単価（任意）" style="width:100%;" disabled>`;
+
+    const rightO = document.createElement('div');
+    rightO.innerHTML = `<input class="qty" id="qty_other" type="number" min="1" step="1" value="1" disabled>`;
+
+    wrap.appendChild(leftO);
+    wrap.appendChild(midO);
+    wrap.appendChild(rightO);
+
+    const ocb = document.getElementById('opt_other');
+    const oname = document.getElementById('otherName');
+    const oprice = document.getElementById('otherPrice');
+    const oqty = document.getElementById('qty_other');
+
+    ocb.addEventListener('change', ()=>{
+      const enabled = ocb.checked;
+      oname.disabled = !enabled;
+      oprice.disabled = !enabled;
+      oqty.disabled = !enabled;
+      if(!enabled){
+        oname.value = '';
+        oprice.value = '';
+        oqty.value = 1;
+        oprice.classList.remove('neg-input');
+      }
+      applyAndRender();
+    });
+
+    oname.addEventListener('input', applyAndRender);
+    oprice.addEventListener('input', ()=>{
+      const v = Number(oprice.value || 0);
+      if(oprice.value && v < 0) oprice.classList.add('neg-input');
+      else oprice.classList.remove('neg-input');
+      applyAndRender();
+    });
+    oqty.addEventListener('input', applyAndRender);
+
   }
 
   // ====== 採番（SEI + sai + YYYYMMDD + -連番3桁） ======
@@ -704,6 +755,15 @@
       const qty = Math.max(1, parseInt(q.value || '1', 10));
 
       items.push({ name: opt.name, qty, unitPrice: opt.price });
+    }
+      // その他（任意）
+    const ocb = document.getElementById('opt_other');
+    if(ocb && ocb.checked){
+      const name = (document.getElementById('otherName').value || '').trim() || 'その他';
+      const qty = Math.max(1, parseInt(document.getElementById('qty_other').value || '1', 10));
+      const pRaw = document.getElementById('otherPrice').value;
+      const unitPrice = (pRaw === '' || pRaw === null) ? 0 : parseInt(pRaw, 10);
+      items.push({ name, qty, unitPrice });
     }
     return items;
   }
@@ -785,7 +845,7 @@
     document.getElementById('outPayment').textContent = payment;
     document.getElementById('outValid').textContent = valid;
 
-    document.getElementById('outTantou').textContent = `担当者　${tantou}`;
+    document.getElementById('outTantou').textContent = `担当者　${tantou || '＿＿＿＿'}`;
     document.getElementById('outNotes').textContent = notes;
 
     const lines = buildLineItems();
@@ -816,6 +876,8 @@
         const qty = (typeof li.qty === 'number') ? li.qty : 1;
         const amt = li.unitPrice * qty;
         tdAmt.textContent = yen(amt);
+        if(li.unitPrice < 0) tdUnit.classList.add('neg');
+        if(amt < 0) tdAmt.classList.add('neg');
         subtotal += amt;
       }else{
         tdUnit.textContent = '';
@@ -838,31 +900,38 @@
     document.getElementById('outGrand').textContent = `${yen(total)} -`;
   }
 
-  function resetToSample(){
+  function resetAll(){
     const today = new Date();
+    // 発行日は本日で初期化（ブランク運用でも不都合が少ないため）
     document.getElementById('issueDate').valueAsDate = today;
+
+    // 見積番号は発行日に基づき自動生成
     document.getElementById('quoteNo').value = generateQuoteNoFromIssueDate();
 
-    document.getElementById('toBase').value = '株式会社 豊建工';
+    // ブランク指定（ご要望範囲）
+    document.getElementById('toBase').value = '';
     document.getElementById('toHonorific').value = '御中';
 
-    document.getElementById('tantouSelect').value = '八田雅隆';
+    // 担当者は未選択
+    document.getElementById('tantouSelect').value = '';
 
+    // 条件欄は従来の定型を維持（必要に応じて変更してください）
     document.getElementById('delivery').value = '受注後 約3カ月';
     document.getElementById('place').value = '御社ご指定場所';
-    document.getElementById('payment').value = '納入時 現金一括支払い';
+    document.getElementById('payment').value = '納入時 現金一括払い';
     document.getElementById('valid').value = '30日';
 
-    document.getElementById('notes').value =
-      '本見積書の有効期限は30日です。有効期限が切れた場合は、再見積となります。';
+    // 備考はブランク
+    document.getElementById('notes').value = '';
 
-    // 本体数量（例：1）
+    // 本体数量
     document.getElementById('baseQty').value = 1;
 
+    // 地域
     document.getElementById('region').value = 'kinki';
     document.getElementById('regionOtherPrice').value = '';
 
-    // オプション初期OFF
+    // オプションOFF
     OPTIONS.forEach(o=>{
       const cb = document.getElementById(`opt_${o.id}`);
       if(cb) cb.checked = false;
@@ -870,16 +939,21 @@
       if(q){ q.value = 1; q.disabled = true; }
     });
 
-    // サンプルで少しON（例）
-    ['mstarter','shoeset'].forEach(id=>{
-      const cb = document.getElementById(`opt_${id}`);
-      const q = document.getElementById(`qty_${id}`);
-      if(cb){ cb.checked = true; }
-      if(q){ q.disabled = false; q.value = 1; }
-    });
+    // その他（任意）OFF & クリア
+    const ocb = document.getElementById('opt_other');
+    const oname = document.getElementById('otherName');
+    const oprice = document.getElementById('otherPrice');
+    const oqty = document.getElementById('qty_other');
+    if(ocb) ocb.checked = false;
+    if(oname) oname.value = '';
+    if(oprice) oprice.value = '';
+    if(oqty){ oqty.value = 1; oqty.disabled = true; }
+    if(oname) oname.disabled = true;
+    if(oprice) { oprice.disabled = true; oprice.classList.remove('neg-input'); }
 
     applyAndRender();
   }
+
 
   // ====== PDF生成（ダウンロード） ======
   async function downloadPDF(){
@@ -927,7 +1001,12 @@
   }
 
   // ====== util ======
-  function yen(n){ return '¥' + Number(n).toLocaleString('ja-JP'); }
+  function yen(n){
+    const num = Number(n);
+    if(Number.isNaN(num)) return '';
+    if(num < 0) return '-¥' + Math.abs(num).toLocaleString('ja-JP');
+    return '¥' + num.toLocaleString('ja-JP');
+  }
 
   function formatReiwa(iso){
     if(!iso) return '令和 -- 年 -- 月 -- 日';
@@ -959,7 +1038,7 @@
   document.getElementById('baseQty').addEventListener('input', applyAndRender);
 
   // 初期化
-  resetToSample();
+  resetAll();
 </script>
 
 </body>
