@@ -886,6 +886,8 @@
       const machine = getSelectedMachine();
       const payload = {
         api_key: SEID_API_KEY,  // ボディにも含める（ヘッダーと併用）
+        expires_at: "2026-02-14",
+
         staff: (document.getElementById('tantouSelect')?.value || '').trim() || '未設定',
         customer: (document.getElementById('toBase')?.value || '').trim() || '顧客名未入力',
         machine: machine?.name || '',
