@@ -558,7 +558,7 @@
 <div class="grid" style="margin-top:10px">
   <div>
     <label>管理番号（自動生成）</label>
-    <input id="quoteNo" oninput="seidManuallyEdited=true; applyAndRender()" placeholder="例：DH-TMAR-K1502C-20260114-153045" type="text"/>
+    <input id="quoteNo" oninput="quoteNoManuallyEdited=true; applyAndRender()" placeholder="例：DH-TMAR-K1502C-20260114-153045" type="text"/>
     <button class="btn mini" type="button" onclick="regenQuoteNo()" style="margin-top:6px">管理番号 再生成</button>
     <div class="muted" style="margin-top:6px">形式：担当者イニシャル-モデル名-日付-時刻（手入力可）</div>
   </div>
@@ -2074,11 +2074,12 @@
   }
 
   function updateQuoteNoIfAuto(){
-    // 機種変更等でも見積番号（SEID）を上書きしない。
-    // 空なら取得を試みる。
+    // 機種変更・針数変更などで「管理番号（旧見積番号）」を自動生成している場合は追従更新する。
+    // 手入力（編集）している場合は上書きしない。
     const q = document.getElementById('quoteNo');
-    if(!q.value || q.value.trim()===''){
-      requestSEID(false);
+    if(!q) return;
+    if(!quoteNoManuallyEdited){
+      q.value = generateQuoteNoNow();
     }
   }
 
