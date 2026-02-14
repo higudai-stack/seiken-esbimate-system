@@ -537,6 +537,7 @@
 <div>
 <label>見積番号（SEID）</label>
 <input id="seidNo" oninput="seidManuallyEdited=true; seidLocked=false; this.readOnly=false; applyAndRender()" placeholder="例：SEID-0001" type="text"/>
+<button class="btn mini primary" type="button" onclick="requestSEID(true)" style="margin-top:6px">OK（SEID採番）</button>
 <button class="btn mini" type="button" onclick="requestSEID(true)" style="margin-top:6px">SEID再取得</button>
 <div class="muted" style="margin-top:6px">
               形式：SEID-0001（サーバー発番・手入力は非推奨）
@@ -885,14 +886,25 @@
 　　　const mm = String(d.getMonth() + 1).padStart(2, '0');
 　　　const dd = String(d.getDate()).padStart(2, '0');
 　　　const expiresYmd = `${yyyy}-${mm}-${dd}`;
+
+        // SEID採番は「担当者」と「お客様名」が必須（未入力なら採番しない）
+        const staffVal = (document.getElementById('tantouSelect')?.value || '').trim();
+        const customerVal = (document.getElementById('toBase')?.value || '').trim();
+        if(!staffVal || !customerVal){
+          alert('担当者とお客様名が未入力です。
+
+担当者とお客様名を入力してから「OK（SEID採番）」を押してください。');
+          return;
+        }
+
         
    　const payload = {
   　　api_key: SEID_API_KEY,
 　　　expires_at: expiresYmd, 
 
 
-        staff: (document.getElementById('tantouSelect')?.value || '').trim() || '未設定',
-        customer: (document.getElementById('toBase')?.value || '').trim() || '顧客名未入力',
+        staff: staffVal,
+        customer: customerVal,
         machine: machine?.name || '',
         product_code: machine?.category || '',
         total: 0,  // 見積合計は後で計算されるため、ここでは0
@@ -3336,8 +3348,7 @@ function addTradeInOption(container) {
     // 見積番号：リセット時は自動生成にする
     seidManuallyEdited = false;
     document.getElementById('quoteNo').value = '';
-    requestSEID(false);
-
+    // SEIDは自動採番しない（OKボタンで採番）
     applyAndRender();
   }
 
@@ -3450,10 +3461,8 @@ updateOptionsList();
 
     // 初回：管理番号（旧見積番号）を自動生成
     document.getElementById('quoteNo').value = generateQuoteNoNow();
-    // 初回：SEIDを取得（API未設定なら暫定ID）
-    document.getElementById('seidNo').value = '';
-    requestSEID(false);
-
+    // 初回：SEIDは自動採番しない（OKボタンで採番）
+    // （必要なら手入力、またはOK（SEID採番）で取得）
     applyAndRender();
   });
 </script>
